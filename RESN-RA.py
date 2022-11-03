@@ -87,13 +87,63 @@ print('Total # Trainable Parameters = ', pytorch_total_params,  '!!!!!!!')
 optimizer = optim.Adam(model.parameters(), lr=wbconfig.LR)
 criterion = nn.CrossEntropyLoss()
    
+TALL_REWARDS = []
+for epoch in range(wbconfig.num_episodes):
+    for phase in ['train']:
+        if phase == 'train':
+            model.train() 
+        rewards = 0
+        for cat_i in range(cats):
+            inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
+            inputs = torch.cat((inputs,inputs,inputs),1).to(device)
+            labels = torch.tensor(cat_i)[None,...].to(device)
+            optimizer.zero_grad()
+            with torch.set_grad_enabled(True):
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                _, preds = torch.max(outputs, 1)
+                loss.backward()
+                optimizer.step()
+            reward = reward_fx(cat_i, preds)
+            rewards += reward
+        wandb.log({phase+'-episode_reward' : rewards})
+        TALL_REWARDS.append(rewards)
+    wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/wbconfig.num_episodes})
+
+
+
+
+VALL_REWARDS = []
+for epoch in range(10):
+    for phase in ['val']:
+        model.eval() 
+        rewards = 0
+        for cat_i in range(cats):
+            inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
+            inputs = torch.cat((inputs,inputs,inputs),1).to(device)
+            labels = torch.tensor(cat_i)[None,...].to(device)
+            optimizer.zero_grad()
+            with torch.set_grad_enabled(False):
+                outputs = model(inputs)
+                loss = criterion(outputs, labels)
+                _, preds = torch.max(outputs, 1)
+            reward = reward_fx(cat_i, preds)
+            rewards += reward
+        wandb.log({phase+'-episode_reward' : rewards})
+        VALL_REWARDS.append(rewards)
+    wandb.log({phase+'total_reward':np.asarray(VALL_REWARDS).sum()/10})
+
+print(np.asarray(VALL_REWARDS).sum()/10)
+
+######SPLIT TRAINING TASK
+
+# print("BEGGINING FIRST 15 CATEGORY TRAINING")
 # TALL_REWARDS = []
 # for epoch in range(wbconfig.num_episodes):
-#     for phase in ['train']:
-#         if phase == 'train':
-#             model.train() 
+#     for phase in ['first-train']:
+#         model.train() 
 #         rewards = 0
-#         for cat_i in range(cats):
+#         for cat_i in range(15):
 #             inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
 #             inputs = torch.cat((inputs,inputs,inputs),1).to(device)
 #             labels = torch.tensor(cat_i)[None,...].to(device)
@@ -111,101 +161,54 @@ criterion = nn.CrossEntropyLoss()
 #     wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/wbconfig.num_episodes})
 
 
+# print("BEGGINING SECOND 15 CATEGORY TRAINING")
+# TALL_REWARDS = []
+# for epoch in range(wbconfig.num_episodes):
+#     for phase in ['second-train']:
+#         model.train() 
+#         rewards = 0
+#         for cat_i in range(15,30):
+#             inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
+#             inputs = torch.cat((inputs,inputs,inputs),1).to(device)
+#             labels = torch.tensor(cat_i)[None,...].to(device)
+#             optimizer.zero_grad()
+#             with torch.set_grad_enabled(True):
+#                 outputs = model(inputs)
+#                 loss = criterion(outputs, labels)
+#                 _, preds = torch.max(outputs, 1)
+#                 loss.backward()
+#                 optimizer.step()
+#             reward = reward_fx(cat_i, preds)
+#             rewards += reward
+#         wandb.log({phase+'-episode_reward' : rewards})
+#         TALL_REWARDS.append(rewards)
+#     wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/wbconfig.num_episodes})
 
 
-# VALL_REWARDS = []
-# for epoch in range(10):
-#     for phase in ['val']:
-#         model.eval() 
+##### SPLIT TRAINING TASK PLUS FULL LEARNING PASS
+
+# print("Beggining FULL!!!")
+# TALL_REWARDS = []
+# for epoch in range(1):
+#     for phase in ['full-train']:
+#         model.train() 
 #         rewards = 0
 #         for cat_i in range(cats):
 #             inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
 #             inputs = torch.cat((inputs,inputs,inputs),1).to(device)
 #             labels = torch.tensor(cat_i)[None,...].to(device)
 #             optimizer.zero_grad()
-#             with torch.set_grad_enabled(False):
+#             with torch.set_grad_enabled(True):
 #                 outputs = model(inputs)
 #                 loss = criterion(outputs, labels)
 #                 _, preds = torch.max(outputs, 1)
+#                 loss.backward()
+#                 optimizer.step()
 #             reward = reward_fx(cat_i, preds)
 #             rewards += reward
 #         wandb.log({phase+'-episode_reward' : rewards})
-#         VALL_REWARDS.append(rewards)
-#     wandb.log({phase+'total_reward':np.asarray(VALL_REWARDS).sum()/10})
-
-# print(np.asarray(VALL_REWARDS).sum()/10)
-
-
-
-print("BEGGINING FIRST 15 CATEGORY TRAINING")
-TALL_REWARDS = []
-for epoch in range(wbconfig.num_episodes):
-    for phase in ['first-train']:
-        model.train() 
-        rewards = 0
-        for cat_i in range(15):
-            inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
-            inputs = torch.cat((inputs,inputs,inputs),1).to(device)
-            labels = torch.tensor(cat_i)[None,...].to(device)
-            optimizer.zero_grad()
-            with torch.set_grad_enabled(True):
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                _, preds = torch.max(outputs, 1)
-                loss.backward()
-                optimizer.step()
-            reward = reward_fx(cat_i, preds)
-            rewards += reward
-        wandb.log({phase+'-episode_reward' : rewards})
-        TALL_REWARDS.append(rewards)
-    wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/wbconfig.num_episodes})
-
-
-print("BEGGINING SECOND 15 CATEGORY TRAINING")
-TALL_REWARDS = []
-for epoch in range(wbconfig.num_episodes):
-    for phase in ['second-train']:
-        model.train() 
-        rewards = 0
-        for cat_i in range(15,30):
-            inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
-            inputs = torch.cat((inputs,inputs,inputs),1).to(device)
-            labels = torch.tensor(cat_i)[None,...].to(device)
-            optimizer.zero_grad()
-            with torch.set_grad_enabled(True):
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                _, preds = torch.max(outputs, 1)
-                loss.backward()
-                optimizer.step()
-            reward = reward_fx(cat_i, preds)
-            rewards += reward
-        wandb.log({phase+'-episode_reward' : rewards})
-        TALL_REWARDS.append(rewards)
-    wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/wbconfig.num_episodes})
-
-print("Beggining FULL!!!")
-TALL_REWARDS = []
-for epoch in range(1):
-    for phase in ['full-train']:
-        model.train() 
-        rewards = 0
-        for cat_i in range(cats):
-            inputs = getSpikesInNextTimeslot(CategorySpikeProbabilities[cat_i,:])
-            inputs = torch.cat((inputs,inputs,inputs),1).to(device)
-            labels = torch.tensor(cat_i)[None,...].to(device)
-            optimizer.zero_grad()
-            with torch.set_grad_enabled(True):
-                outputs = model(inputs)
-                loss = criterion(outputs, labels)
-                _, preds = torch.max(outputs, 1)
-                loss.backward()
-                optimizer.step()
-            reward = reward_fx(cat_i, preds)
-            rewards += reward
-        wandb.log({phase+'-episode_reward' : rewards})
-        TALL_REWARDS.append(rewards)
-    wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/1})
+#         TALL_REWARDS.append(rewards)
+#     wandb.log({phase+'total_reward':np.asarray(TALL_REWARDS).sum()/1})
 
 
 
